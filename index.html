@@ -1,0 +1,369 @@
+      <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/src/assets/images/IPST_Logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>การเขียนเศษส่วนในรูปทศนิยม</title>
+    <style>
+        body {
+            font-family: Sarabun, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+
+		.rectangle {
+		    position: relative; /* Static container for stacking grids */
+		    width: 400px;
+		    height: 200px;
+		    background-color: #f0f0f0;
+		    border: 2px solid #ccc;
+		    margin: 20px auto;
+		    overflow: hidden; /* Ensures no content overflows */
+		}
+		
+		.grid {
+		    position: absolute;
+		    top: 0;
+		    left: 0;
+		    width: 100%;
+		    height: 100%;
+		    display: grid;
+		}
+
+        .cell {
+            border: 1px solid #ddd;
+            background-color: #f0f0f0;
+        }
+
+        .cell.shaded {
+            background-color: #007BFF;
+        }
+
+        .fraction {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 1.5rem;
+            vertical-align: middle;
+        }
+
+        .fraction .numerator {
+            border-bottom: 1px solid #000;
+            padding: 0 5px;
+        }
+
+        .fraction .denominator {
+            padding: 0 5px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        .controls input[type="text"] {
+            width: 50px;
+            text-align: center;
+            margin: 0 10px;
+        }
+
+        .controls label {
+            margin: 0 10px;
+            font-size: 1.2rem;
+        }
+
+        .controls span {
+            margin-right: 10px;
+        }
+
+        #result {
+            margin-top: 20px;
+            font-size: 1.2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .equation {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+			font-size: 0.8rem;
+        }
+
+        .equals {
+            margin: 0 10px;
+            display: flex;
+            align-items: center;
+        }
+
+        .warning {
+            color: red;
+            margin-top: 10px;
+        }
+        hr {
+            border: 1px solid #ccc;
+            width: 100%;
+            margin: 10px 0;
+        }
+		.fade-out {
+		    opacity: 0;
+		    transition: opacity 1s ease-in-out; /* Smooth fade-out */
+		}
+
+		.fade-in {
+		    opacity: 1;
+		    transition: opacity 1s ease-in-out; /* Smooth fade-in */
+		}
+    </style>
+</head>
+<body>
+    <h1> 
+		เขียน &nbsp; 
+        <span class="fraction" id="fraction">
+            <span class="numerator"></span>
+            <span class="denominator"></span>
+        </span>
+		&nbsp; ในรูปทศนิยม</h1>
+
+    <div class="rectangle" id="rectangle"></div>
+
+    <div class="controls">
+        <label><input type="radio" name="operation" value="multiply"> &times;</label>
+        <label><input type="radio" name="operation" value="divide"> &divide;</label>
+		<span>&nbsp; ด้วย</span>
+        <input type="text" id="factor" value="1" oninput="this.value = this.value.replace(/[^0-9]/g, '').substring(0, 3);">
+        <span>ทั้งตัวเศษและตัวส่วน</span>
+        <button onclick="calculateNewFraction()">ลอง</button>
+    </div>
+
+    <div id="result"></div>
+
+    <script>
+        const fractions = [
+            { numerator: 72, denominator: 192 },
+            { numerator: 81, denominator: 90 },
+            { numerator: 68, denominator: 80 },
+			{ numerator: 3, denominator: 6 },
+			{ numerator: 27, denominator: 75 },
+			{ numerator: 18, denominator: 72 },
+			{ numerator: 275, denominator: 375 }
+			
+			/*
+			{ numerator: 68, denominator: 80 },
+			{ numerator: 66, denominator: 80 }
+			*/
+			
+			
+			/*
+			//Examples of fractions that don't work
+			{ numerator: 275, denominator: 375 }, // more than 3 decimals
+			{ numerator: 245, denominator: 375 }, // more than 3 decimals
+			{ numerator: 297, denominator: 375 } // 3 decimals, but horrible drawing
+			*/
+			
+			
+			// { numerator: 29, denominator: 125 }
+			
+        ];
+
+        // Randomly select a fraction
+        const randomFraction = fractions[Math.floor(Math.random() * fractions.length)];
+        let currentNumerator = randomFraction.numerator;
+        let currentDenominator = randomFraction.denominator;
+
+        // Display the selected fraction
+        document.querySelector('.numerator').textContent = currentNumerator;
+        document.querySelector('.denominator').textContent = currentDenominator;
+
+		function findDimensions(currentDenominator) {
+		    const dimensions = [];
+		    for (let m = 1; m <= Math.sqrt(currentDenominator); m++) {
+		        if (currentDenominator % m === 0) {
+		            const n = currentDenominator / m;
+		            dimensions.push([m, n]);
+		        }
+		    }
+		    return dimensions;
+		}
+		
+		function findRowsAndCols(dimensions, currentNumerator) {
+            console.log("Checking Dimensions:", dimensions);
+            console.log("Numerator:", currentNumerator);
+            for (let i = dimensions.length - 1; i >= 0; i--) {
+                const [m_i, n_i] = dimensions[i];
+                if (currentNumerator % m_i === 0) {
+                    console.log(`Shading by column: Rows = ${m_i}, Cols = ${n_i}`);
+                    return { rows: m_i, cols: n_i, shadeBy: 'column' };
+                } else if (currentNumerator % n_i === 0) {
+                    console.log(`Shading by column: Rows = ${n_i}, Cols = ${m_i}`);
+                    return { rows: n_i, cols: m_i, shadeBy: 'column' };
+                }
+            }
+            return null; // No valid arrangement found
+        }
+
+        const rectangleElement = document.getElementById('rectangle');
+
+		function drawGrid(numerator, denominator) {
+		    const dimensions = findDimensions(currentDenominator);
+		    const gridConfig = findRowsAndCols(dimensions, currentNumerator);
+
+		    if (!gridConfig) {
+		        console.error("No valid grid configuration found.");
+		        return;
+		    }
+
+		    const { rows, cols, shadeBy } = gridConfig;
+
+		    // Step 1: Create a new grid element
+		    const newGrid = document.createElement('div');
+		    newGrid.classList.add('grid'); 
+		    newGrid.style.opacity = "0"; // Start new grid invisible
+		    newGrid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+		    newGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+		    const totalCells = rows * cols;
+		    const shadedCells = shadeBy === 'row' ? numerator / cols : numerator / rows;
+
+		    for (let i = 0; i < totalCells; i++) {
+		        const cell = document.createElement('div');
+		        cell.classList.add('cell');
+		        if (shadeBy === 'row' && Math.floor(i / cols) < shadedCells) {
+		            cell.classList.add('shaded');
+		        } else if (shadeBy === 'column' && i % cols < shadedCells) {
+		            cell.classList.add('shaded');
+		        }
+		        newGrid.appendChild(cell);
+		    }
+
+		    // Step 2: Fade out the old grid
+		    const oldGrid = rectangleElement.querySelector('.grid');
+		    if (oldGrid) {
+		        oldGrid.classList.add('fade-out'); // Trigger fade-out
+		    }
+
+		    // Step 3: Add the new grid and immediately trigger fade-in
+		    rectangleElement.appendChild(newGrid);
+		    requestAnimationFrame(() => {
+		        newGrid.style.opacity = "1"; // Fade in the new grid smoothly
+		        newGrid.style.transition = "opacity 1s ease-in-out"; // Ensure transition applies
+		    });
+
+		    // Step 4: Clean up old grid after animation
+		    setTimeout(() => {
+		        if (oldGrid) oldGrid.remove();
+		    }, 1000); // Match the 1s duration of the transition
+		}
+
+        drawGrid(currentNumerator, currentDenominator);
+
+        function calculateNewFraction() {
+            const resultDiv = document.getElementById('result');
+
+            // Clear previous warnings
+            const previousWarnings = document.querySelectorAll('.warning');
+            previousWarnings.forEach(warning => warning.remove());
+
+            const factor = parseInt(document.getElementById('factor').value, 10);
+            const operation = document.querySelector('input[name="operation"]:checked')?.value;
+
+            if (!factor || !operation) {
+                const warningHTML = `<div class='warning'>กรุณาเลือกตัวดำเนินการและป้อนตัวเลขที่ถูกต้อง</div>`;
+                resultDiv.innerHTML += warningHTML;
+                return;
+            }
+
+            const newNumerator = operation === 'multiply' ? currentNumerator * factor : currentNumerator / factor;
+            const newDenominator = operation === 'multiply' ? currentDenominator * factor : currentDenominator / factor;
+
+            if (!Number.isInteger(newNumerator) || !Number.isInteger(newDenominator)) {
+                const warningHTML = `<div class='warning'>${factor} ไปหารตัวเศษและ/หรือตัวส่วนไม่ลงตัว ลองใหม่</div>`;
+                resultDiv.innerHTML += warningHTML;
+                return;
+            }
+
+          
+            const equationHTML = `
+                <div class="equation">
+                    <span class="fraction">
+                        <span class="numerator">${currentNumerator}</span>
+                        <span class="denominator">${currentDenominator}</span>
+                    </span>
+                    <span class="equals">=</span>
+                    <span class="fraction">
+                        <span class="numerator">${operation === 'multiply' ? currentNumerator + ' × ' + factor : currentNumerator + ' ÷ ' + factor}</span>
+                        <span class="denominator">${operation === 'multiply' ? currentDenominator + ' × ' + factor : currentDenominator + ' ÷ ' + factor}</span>
+                    </span>
+                    <span class="equals">=</span>
+                    <span class="fraction">
+                        <span class="numerator">${newNumerator}</span>
+                        <span class="denominator">${newDenominator}</span>
+                    </span>
+                </div>
+            `;
+
+            resultDiv.innerHTML += equationHTML;
+
+
+            currentNumerator = newNumerator;
+            currentDenominator = newDenominator;
+          
+            drawGrid(currentNumerator, currentDenominator);
+
+            if (newDenominator === 10 || newDenominator === 100 || newDenominator === 1000) {
+              const fractionHTML = `
+                      <hr>
+                      <div style="margin-top: 10px;" class='equation'>
+                      <span class="fraction">
+                          <span class="numerator">${randomFraction.numerator}</span>
+                          <span class="denominator">${randomFraction.denominator}</span>
+                      </span>
+                      <span class="equals">=</span>
+                      <span class="fraction">
+                          <span class="numerator">${newNumerator}</span>
+                          <span class="denominator">${newDenominator}</span>
+                      </span>
+                  </div>
+                  <div style="margin-top: 20px; text-align: center;">
+                      <span>ดังนั้น 
+                      <span class="fraction">
+                          <span class="numerator">${randomFraction.numerator}</span>
+                          <span class="denominator">${randomFraction.denominator}</span>
+                      </span> เขียนเป็นทศนิยมได้ว่า </span>
+                      <input type="text" id="decimalAnswer" style="margin-left: 10px; width: 100px; text-align: center;" oninput="this.value = this.value.replace(/[^0-9.]/g, '');">
+                      <button onclick="submitDecimalAnswer()">ตอบ</button>
+                  </div>
+              `;
+              resultDiv.innerHTML += fractionHTML;
+            }
+        }
+        
+        function submitDecimalAnswer() {
+            document.querySelectorAll('#result div.feedback').forEach(feedback => feedback.remove()); // Clear previous feedback
+          
+            const answerInput = document.getElementById('decimalAnswer').value;
+            const correctAnswer = randomFraction.numerator / randomFraction.denominator;
+          
+            const feedback = document.createElement('div');
+            feedback.style.marginTop = '10px';
+            feedback.classList.add('feedback'); // Add a class to identify feedback elements
+          
+            if (parseFloat(answerInput) === parseFloat(correctAnswer)) {
+                feedback.textContent = 'ถูกต้อง';
+                feedback.style.color = 'green';
+            } else {
+                feedback.textContent = 'ยังไม่ถูกต้อง ลองใหม่อีกครั้ง';
+                feedback.style.color = 'red';
+            }
+          
+            // Append feedback below the answer input
+            const resultDiv = document.getElementById('result');
+            resultDiv.appendChild(feedback);
+        }
+    </script>
+</body>
+</html>
